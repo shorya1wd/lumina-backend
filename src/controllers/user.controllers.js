@@ -120,15 +120,23 @@ const loginUser=asyncHandler(async(req,res)=>{
         throw new ApiError(404,"User not found")
     }
    
-    const options = {
+    const accessTokenOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
-}
+    secure: true,
+    sameSite: 'none',
+    maxAge: 1 * 24 * 60 * 60 * 1000
+};
+
+const refreshTokenOptions = {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 10 * 24 * 60 * 60 * 1000
+};
 
     res.status(200)
-        .cookie("accessToken",accessToken,options)
-        .cookie("refreshToken",refreshToken,options)
+        .cookie("accessToken",accessToken,accessTokenOptions)
+        .cookie("refreshToken",refreshToken,refreshTokenOptions)
         .json(new ApiResponse(200,{user:loggedInUser,accessToken,refreshToken},"User logged in successfully"))
 
 })
@@ -153,15 +161,23 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
             throw new ApiError(401,"Refresh token is expired")
         }
 
-        const options = {
+        const accessTokenOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+    secure: true,
+    sameSite: 'none',
+    maxAge: 1 * 24 * 60 * 60 * 1000
+};
+
+const refreshTokenOptions = {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 10 * 24 * 60 * 60 * 1000
 }
 
         const {accessToken,refreshToken}=await generateAccessAndRefreshToken(user._id)
 
-        return res.status(200).cookie("accessToken",accessToken,options).cookie("refreshToken",refreshToken,options)
+        return res.status(200).cookie("accessToken",accessToken,accessTokenOptions).cookie("refreshToken",refreshToken,refreshTokenOptions)
             .json(new ApiResponse(200,{accessToken,refreshToken},"Access and refresh Token generated Successfully"))
 
     } catch (error) {
