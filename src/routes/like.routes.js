@@ -4,10 +4,8 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router()
 
-//unsecured
 
 
-//secured
 
 router.use(verifyJWT)
 

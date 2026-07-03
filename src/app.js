@@ -17,7 +17,6 @@ const morganFormat = ":method :url :status :response-time ms";
 
 const app=express()
 
-//middlewares
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 app.use(express.static("public"))
@@ -45,7 +44,6 @@ app.use(
 )
 
 
-//routes
 app.use("/api/v1/healthcheck",healthCheckRouter)
 app.use("/api/v1/user",userRouter)
 app.use("/api/v1/videos",videoRouter)

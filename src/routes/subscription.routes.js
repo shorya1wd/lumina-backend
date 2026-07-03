@@ -4,11 +4,8 @@ import {getUserChannelSubscribers,getSubscribedChannels,toggleSubscription} from
 
 const router=Router()
 
-//unsecured routes
 
-//
 
-// secured routes
 
 router.use(verifyJWT)
 

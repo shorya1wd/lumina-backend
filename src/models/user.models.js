@@ -38,6 +38,22 @@ import jwt from "jsonwebtoken"
     },
     refreshToken:{
         type:String
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    verifyCode: {
+        type: String
+    },
+    verifyCodeExpiry: {
+        type: Date
+    },
+    forgotPasswordToken: {
+        type: String
+    },
+    forgotPasswordExpiry: {
+        type: Date
     }
   },
   {

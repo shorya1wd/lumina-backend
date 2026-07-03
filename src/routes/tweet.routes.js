@@ -1,12 +1,12 @@
-import {createTweet,getUserTweets,updateTweet,deleteTweet} from "../controllers/tweet.controllers.js"
-import { verifyJWT,optionalVerifyJWT } from "../middlewares/auth.middleware.js";
+import { createTweet, getUserTweets, updateTweet, deleteTweet } from "../controllers/tweet.controllers.js"
+import { verifyJWT, optionalVerifyJWT } from "../middlewares/auth.middleware.js";
 import { Router } from "express";
 
-const router=Router()
+const router = Router()
 
 //unsecured 
 
-router.route("/t/:userId").get(optionalVerifyJWT,getUserTweets)
+router.route("/t/:userId").get(optionalVerifyJWT, getUserTweets)
 
 //secured
 

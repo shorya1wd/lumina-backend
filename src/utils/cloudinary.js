@@ -49,17 +49,12 @@ const deleteFromCloudinary=async(publicId,resourceType="image")=>{
 const extractPublicId = (cloudinaryUrl) => {
     if (!cloudinaryUrl) return null;
 
-    // 1. Split the URL by slashes
     const parts = cloudinaryUrl.split('/');
     
-    // 2. Find the index of the word "upload"
     const uploadIndex = parts.indexOf('upload');
 
-    // 3. The public ID starts AFTER "upload" and the version string ("v123456789")
-    // So we slice the array from uploadIndex + 2 to the end, and join it back with slashes
     const publicIdWithExtension = parts.slice(uploadIndex + 2).join('/');
 
-    // 4. Remove the extension (.jpg, .png) safely, even if the filename has dots in it
     const lastDotIndex = publicIdWithExtension.lastIndexOf('.');
     const publicId = publicIdWithExtension.substring(0, lastDotIndex);
 

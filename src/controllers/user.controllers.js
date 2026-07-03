@@ -3,6 +3,8 @@ import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.models.js"
 import { uploadOnCloudinary ,deleteFromCloudinary,extractPublicId} from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email.js";
+import crypto from "crypto";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
 import { WatchHistory } from "../models/watchHistory.models.js";
@@ -62,16 +64,24 @@ const registerUser=asyncHandler(async(req,res)=>{
     }
     
     try {
+        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verifyCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
         const user=await User.create({
             fullname,
             username,
             email,
             password,
             avatar:avatarUrl,
-            coverImage:coverImageUrl
+            coverImage:coverImageUrl,
+            isVerified: false,
+            verifyCode,
+            verifyCodeExpiry
         })
         
-        const createdUser=await User.findById(user._id).select("-password -refreshToken")
+        await sendVerificationEmail(email, verifyCode);
+
+        const createdUser=await User.findById(user._id).select("-password -refreshToken -verifyCode -forgotPasswordToken")
     
         if(!createdUser){
             throw new ApiError(500,"Something went wrong while registering user")
@@ -104,6 +114,10 @@ const loginUser=asyncHandler(async(req,res)=>{
 
     if(!user){
         throw new ApiError(404,"User not found")
+    }
+
+    if (!user.isVerified) {
+        throw new ApiError(403, "Please verify your email address to login");
     }
 
     const userPasswordIsCorrect=await user.isPasswordCorrect(password)
@@ -201,9 +215,9 @@ const logoutUser=asyncHandler(async(req,res)=>{
 
     const options = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
-}
+    secure: true,
+    sameSite: 'none'
+};
 
     res.status(200).clearCookie("accessToken",options).clearCookie("refreshToken",options)
         .json(new ApiResponse(200,{},"User logged out successfully"))
@@ -464,5 +478,122 @@ const getWatchHistory=asyncHandler(async(req,res)=>{
 
 })
 
+const verifyEmail = asyncHandler(async (req, res) => {
+    const { email, code } = req.body;
 
-export {registerUser,loginUser,refreshAccessToken,logoutUser,changeCurrentPassword,getCurrentUser,updateProfileDetails,updateUserAvatar,updateUserCoverImage,getUserChannelProfile,getWatchHistory}
+    if (!email || !code) {
+        throw new ApiError(400, "Email and verification code are required");
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (user.isVerified) {
+        throw new ApiError(400, "User is already verified");
+    }
+
+    if (user.verifyCode !== code) {
+        throw new ApiError(400, "Invalid verification code");
+    }
+
+    if (user.verifyCodeExpiry < new Date()) {
+        throw new ApiError(400, "Verification code has expired");
+    }
+
+    user.isVerified = true;
+    user.verifyCode = undefined;
+    user.verifyCodeExpiry = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json(new ApiResponse(200, {}, "Email verified successfully. You can now login."));
+});
+
+const resendVerificationCode = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        throw new ApiError(400, "Email is required");
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (user.isVerified) {
+        throw new ApiError(400, "User is already verified");
+    }
+
+    const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verifyCode = verifyCode;
+    user.verifyCodeExpiry = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    await sendVerificationEmail(email, verifyCode);
+
+    return res.status(200).json(new ApiResponse(200, {}, "Verification code resent successfully"));
+});
+
+const forgotPassword = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        throw new ApiError(400, "Email is required");
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.forgotPasswordToken = hashedToken;
+    user.forgotPasswordExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save({ validateBeforeSave: false });
+
+    const frontendUrl = process.env.CORS_ORIGIN || "http://localhost:5173";
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    await sendPasswordResetEmail(user.email, resetUrl);
+
+    return res.status(200).json(new ApiResponse(200, {}, "Password reset link sent to email"));
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!token || !newPassword) {
+        throw new ApiError(400, "Token and new password are required");
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+        forgotPasswordToken: hashedToken,
+        forgotPasswordExpiry: { $gt: Date.now() }
+    });
+
+    if (!user) {
+        throw new ApiError(400, "Token is invalid or expired");
+    }
+
+    user.password = newPassword;
+    user.forgotPasswordToken = undefined;
+    user.forgotPasswordExpiry = undefined;
+    
+    // Allow the pre-save hook to hash the new password
+    await user.save();
+
+    return res.status(200).json(new ApiResponse(200, {}, "Password reset successfully"));
+});
+
+
+export {registerUser,loginUser,refreshAccessToken,logoutUser,changeCurrentPassword,getCurrentUser,updateProfileDetails,updateUserAvatar,updateUserCoverImage,getUserChannelProfile,getWatchHistory, verifyEmail, resendVerificationCode, forgotPassword, resetPassword}
