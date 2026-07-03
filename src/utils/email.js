@@ -4,6 +4,7 @@ const createTransporter = () => {
     return nodemailer.createTransport({
         host: process.env.SMTP_HOST || "smtp.mailtrap.io",
         port: process.env.SMTP_PORT || 2525,
+        secure: Number(process.env.SMTP_PORT) === 465, // True for 465, false for other ports
         auth: {
             user: process.env.SMTP_USER || "test_user",
             pass: process.env.SMTP_PASS || "test_pass"
