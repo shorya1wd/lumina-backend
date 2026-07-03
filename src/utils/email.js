@@ -7,7 +7,8 @@ const createTransporter = () => {
         auth: {
             user: process.env.SMTP_USER || "test_user",
             pass: process.env.SMTP_PASS || "test_pass"
-        }
+        },
+        connectionTimeout: 10000 // 10 seconds timeout to prevent hanging
     });
 };
 

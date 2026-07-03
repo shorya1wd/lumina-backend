@@ -39,7 +39,7 @@ const registerUser=asyncHandler(async(req,res)=>{
     })
 
     if(existingUser){
-        throw new ApiError(409,"User already registered")
+        throw new ApiError(409,"A user with this email or username already exists")
     }
 
     const avatarLocalPath=req.files?.avatar?.[0]?.path
@@ -79,7 +79,10 @@ const registerUser=asyncHandler(async(req,res)=>{
             verifyCodeExpiry
         })
         
-        await sendVerificationEmail(email, verifyCode);
+        // Send email in the background to prevent blocking
+        sendVerificationEmail(email, verifyCode).catch((err) => {
+            console.log("Failed to send verification email:", err.message);
+        });
 
         const createdUser=await User.findById(user._id).select("-password -refreshToken -verifyCode -forgotPasswordToken")
     
@@ -116,14 +119,14 @@ const loginUser=asyncHandler(async(req,res)=>{
         throw new ApiError(404,"User not found")
     }
 
-    if (!user.isVerified) {
-        throw new ApiError(403, "Please verify your email address to login");
-    }
-
     const userPasswordIsCorrect=await user.isPasswordCorrect(password)
 
     if(!userPasswordIsCorrect){
         throw new ApiError(401,"Password is Incorrect! Try again.")
+    }
+
+    if (!user.isVerified) {
+        throw new ApiError(403, "Please verify your email address to login");
     }
 
     const {accessToken,refreshToken}=await generateAccessAndRefreshToken(user._id)
@@ -533,7 +536,10 @@ const resendVerificationCode = asyncHandler(async (req, res) => {
     user.verifyCodeExpiry = new Date(Date.now() + 15 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
 
-    await sendVerificationEmail(email, verifyCode);
+    // Send email in the background to prevent blocking
+    sendVerificationEmail(email, verifyCode).catch((err) => {
+        console.log("Failed to resend verification email:", err.message);
+    });
 
     return res.status(200).json(new ApiResponse(200, {}, "Verification code resent successfully"));
 });
@@ -561,7 +567,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
     const frontendUrl = process.env.CORS_ORIGIN || "http://localhost:5173";
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-    await sendPasswordResetEmail(user.email, resetUrl);
+    // Send email in the background to prevent blocking
+    sendPasswordResetEmail(user.email, resetUrl).catch((err) => {
+        console.log("Failed to send reset email:", err.message);
+    });
 
     return res.status(200).json(new ApiResponse(200, {}, "Password reset link sent to email"));
 });
