@@ -1,24 +1,15 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const createTransporter = () => {
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.mailtrap.io",
-        port: process.env.SMTP_PORT || 2525,
-        secure: Number(process.env.SMTP_PORT) === 465, // True for 465, false for other ports
-        auth: {
-            user: process.env.SMTP_USER || "test_user",
-            pass: process.env.SMTP_PASS || "test_pass"
-        },
-        connectionTimeout: 10000 // 10 seconds timeout to prevent hanging
-    });
-};
+// Use SMTP_PASS since it already holds the Resend API key from our previous setup,
+// or fallback to RESEND_API_KEY if the user sets it.
+const resend = new Resend(process.env.RESEND_API_KEY || process.env.SMTP_PASS);
 
 export const sendVerificationEmail = async (email, code) => {
     try {
-        const transporter = createTransporter();
-        
-        const mailOptions = {
-            from: process.env.SMTP_FROM_EMAIL || '"Lumina Support" <support@lumina.com>',
+        const fromEmail = process.env.SMTP_FROM_EMAIL || 'Lumina Support <support@lumina.com>';
+
+        const { data, error } = await resend.emails.send({
+            from: fromEmail,
             to: email,
             subject: 'Verify your Lumina Account',
             html: `
@@ -32,10 +23,14 @@ export const sendVerificationEmail = async (email, code) => {
                     <p style="color: #64748b; font-size: 12px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
                 </div>
             `
-        };
+        });
 
-        const info = await transporter.sendMail(mailOptions);
-        return info;
+        if (error) {
+            console.error("Resend API Error:", error);
+            throw new Error(error.message);
+        }
+
+        return data;
     } catch (error) {
         console.error("Error sending verification email:", error);
         throw new Error("Could not send verification email");
@@ -44,10 +39,10 @@ export const sendVerificationEmail = async (email, code) => {
 
 export const sendPasswordResetEmail = async (email, resetUrl) => {
     try {
-        const transporter = createTransporter();
-        
-        const mailOptions = {
-            from: process.env.SMTP_FROM_EMAIL || '"Lumina Support" <support@lumina.com>',
+        const fromEmail = process.env.SMTP_FROM_EMAIL || 'Lumina Support <support@lumina.com>';
+
+        const { data, error } = await resend.emails.send({
+            from: fromEmail,
             to: email,
             subject: 'Reset your Lumina Password',
             html: `
@@ -63,10 +58,14 @@ export const sendPasswordResetEmail = async (email, resetUrl) => {
                     <p style="color: #64748b; font-size: 12px; margin-top: 30px;">If you didn't request a password reset, you can safely ignore this email.</p>
                 </div>
             `
-        };
+        });
 
-        const info = await transporter.sendMail(mailOptions);
-        return info;
+        if (error) {
+            console.error("Resend API Error:", error);
+            throw new Error(error.message);
+        }
+
+        return data;
     } catch (error) {
         console.error("Error sending password reset email:", error);
         throw new Error("Could not send password reset email");
