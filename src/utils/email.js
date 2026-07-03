@@ -17,7 +17,7 @@ export const sendVerificationEmail = async (email, code) => {
         const transporter = createTransporter();
         
         const mailOptions = {
-            from: '"Lumina Support" <support@lumina.com>',
+            from: process.env.SMTP_FROM_EMAIL || '"Lumina Support" <support@lumina.com>',
             to: email,
             subject: 'Verify your Lumina Account',
             html: `
@@ -46,7 +46,7 @@ export const sendPasswordResetEmail = async (email, resetUrl) => {
         const transporter = createTransporter();
         
         const mailOptions = {
-            from: '"Lumina Support" <support@lumina.com>',
+            from: process.env.SMTP_FROM_EMAIL || '"Lumina Support" <support@lumina.com>',
             to: email,
             subject: 'Reset your Lumina Password',
             html: `
