@@ -11,7 +11,7 @@ import crypto from "crypto"
 
 
 const uploadVideo=asyncHandler(async(req,res)=>{
-    const {title,description}=req.body
+    const {title,description,duration}=req.body
 
     if(!title){
         throw new ApiError(400,"Title is required")
@@ -28,12 +28,16 @@ const uploadVideo=asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Thumbnail is required")
     }
 
-    let videoDuration = 0;
-    try {
-        const metadata = await mm.parseFile(videoFileLocalPath);
-        videoDuration = Math.round(metadata.format.duration) || 0;
-    } catch (err) {
-        console.log("Failed to extract video duration", err);
+    let videoDuration = parseInt(duration, 10);
+    
+    if (isNaN(videoDuration) || videoDuration <= 0) {
+        try {
+            const metadata = await mm.parseFile(videoFileLocalPath);
+            videoDuration = Math.round(metadata.format.duration) || 0;
+        } catch (err) {
+            console.log("Failed to extract video duration", err);
+            videoDuration = 0;
+        }
     }
 
     const video=await uploadOnR2(videoFileLocalPath, "videos")

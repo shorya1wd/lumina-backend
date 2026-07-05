@@ -30,11 +30,11 @@ import jwt from "jsonwebtoken"
     },
     avatar:{
         type:String,
-        default:"https://res.cloudinary.com/dktrehxcq/image/upload/q_auto/f_auto/v1777005098/296fe121-5dfa-43f4-98b5-db50019738a7_mp6qjs.jpg"
+        default:"/User_Avatar.png"
     },
     coverImage:{
         type:String,
-        default:"https://res.cloudinary.com/dktrehxcq/image/upload/q_auto/f_auto/v1777005063/27002_trzft1.jpg"
+        default:"/User_CoverImage.png"
     },
     refreshToken:{
         type:String
