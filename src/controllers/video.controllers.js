@@ -1,7 +1,8 @@
 import {ApiError} from "../utils/ApiError.js"
+import * as mm from 'music-metadata';
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary,deleteFromCloudinary,extractPublicId} from "../utils/cloudinary.js"
+import {uploadOnR2,deleteOnR2,extractPublicId} from "../utils/r2.js"
 import {Video} from "../models/video.models.js"
 import {User} from "../models/user.models.js"
 import mongoose from "mongoose"
@@ -27,11 +28,19 @@ const uploadVideo=asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Thumbnail is required")
     }
 
-    const video=await uploadOnCloudinary(videoFileLocalPath)
-    const thumbnail=await uploadOnCloudinary(thumbnailLocalPath)
+    let videoDuration = 0;
+    try {
+        const metadata = await mm.parseFile(videoFileLocalPath);
+        videoDuration = Math.round(metadata.format.duration) || 0;
+    } catch (err) {
+        console.log("Failed to extract video duration", err);
+    }
+
+    const video=await uploadOnR2(videoFileLocalPath, "videos")
+    const thumbnail=await uploadOnR2(thumbnailLocalPath, "thumbnails")
 
     if(!video || !thumbnail){
-        throw new ApiError(400,"Error uploading video and thumbnail on cloudinary")
+        throw new ApiError(400,"Error uploading video and thumbnail on R2")
     }
 
     const newVideo=await Video.create({
@@ -39,7 +48,7 @@ const uploadVideo=asyncHandler(async(req,res)=>{
         thumbnail:thumbnail.url,
         title:title,
         description:description,
-        duration:video.duration,
+        duration: videoDuration, 
         isPublished:false,
         owner:req.user._id,
     })
@@ -122,10 +131,10 @@ const updateThumbnail=asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Thumnail not available")
     }
 
-    const thumbnail=await uploadOnCloudinary(thumbnailLocalPath)
+    const thumbnail=await uploadOnR2(thumbnailLocalPath, "thumbnails")
 
     if(!thumbnail){
-        throw new ApiError(400,"Failed to upload new thumbnail on cloudinary")
+        throw new ApiError(400,"Failed to upload new thumbnail on R2")
     }
 
     video.thumbnail=thumbnail.url
@@ -133,7 +142,7 @@ const updateThumbnail=asyncHandler(async(req,res)=>{
 
     if(oldThumbnailUrl){
         const publicId=await extractPublicId(oldThumbnailUrl)
-        await deleteFromCloudinary(publicId,"image")
+        await deleteOnR2(publicId)
     }
 
     return res.status(200).json(new ApiResponse(200,updatedVideo,"Thumbnail updated successfully"))
@@ -163,11 +172,11 @@ const deleteVideo=asyncHandler(async(req,res)=>{
 
     if(videoUrl){
         const publicId=await extractPublicId(videoUrl)
-        await deleteFromCloudinary(publicId,"video")
+        await deleteOnR2(publicId)
     }
     if(thumbnailUrl){
         const publicId=await extractPublicId(thumbnailUrl)
-        await deleteFromCloudinary(publicId,"image")
+        await deleteOnR2(publicId)
     }
 
     return res.status(200).json(new ApiResponse(200,{},`video deleted`))

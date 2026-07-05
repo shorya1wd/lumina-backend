@@ -73,7 +73,13 @@ const deleteComment=asyncHandler(async(req,res)=>{
         throw new ApiError(404,"Comment not found");
     }
 
-    if(comment.owner.toString()!==userId.toString()){
+    // Fetch the associated video to check if the user is the video owner
+    const video = await mongoose.model("Video").findById(comment.video);
+
+    const isCommentOwner = comment.owner.toString() === userId.toString();
+    const isVideoOwner = video && video.owner.toString() === userId.toString();
+
+    if(!isCommentOwner && !isVideoOwner){
         throw new ApiError(403,"User not authorized to delete the comment")
     }
 

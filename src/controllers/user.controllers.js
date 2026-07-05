@@ -1,13 +1,14 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.models.js"
-import { uploadOnCloudinary ,deleteFromCloudinary,extractPublicId} from "../utils/cloudinary.js";
+import { deleteOnR2, extractPublicId } from "../utils/r2.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
 import { WatchHistory } from "../models/watchHistory.models.js";
+import { uploadOnR2 } from "../utils/r2.js";
 
 const generateAccessAndRefreshToken=async(userId)=>{
     try {
@@ -51,13 +52,13 @@ const registerUser=asyncHandler(async(req,res)=>{
     let coverImage
 
     if(avatarLocalPath){
-        avatar=await uploadOnCloudinary(avatarLocalPath)
+        avatar=await uploadOnR2(avatarLocalPath, "avatars")
         if(avatar){
             avatarUrl=avatar.url
         }
     }
     if(coverImageLocalPath){
-        coverImage=await uploadOnCloudinary(coverImageLocalPath)
+        coverImage=await uploadOnR2(coverImageLocalPath, "covers")
         if(coverImage){
             coverImageUrl=coverImage.url
         }
@@ -94,10 +95,10 @@ const registerUser=asyncHandler(async(req,res)=>{
     } catch (error) {
         console.log("User creation failed",error)
         if(avatar){
-            await deleteFromCloudinary(avatar.public_id,"image")
+            await deleteOnR2(avatar.key)
         }
         if(coverImage){
-            await deleteFromCloudinary(coverImage.public_id,"image")
+            await deleteOnR2(coverImage.key)
         }
         throw new ApiError(500,`Something went wrong while registering user and images were deleted ${error.message}`)
     }
@@ -296,10 +297,10 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Avatar file is missing")
     }
 
-    const avatar=await uploadOnCloudinary(avatarLocalPath)
+    const avatar=await uploadOnR2(avatarLocalPath, "avatars")
 
-    if(!avatar.url){
-        throw new ApiError(400,"image couldnt upload on cloudinary")
+    if(!avatar || !avatar.url){
+        throw new ApiError(400,"image couldnt upload on R2")
     }
 
     const currentUser=await User.findById(req.user._id)
@@ -319,7 +320,7 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
 
     if(oldAvatarUrl){
         const publicId=extractPublicId(oldAvatarUrl)
-        await deleteFromCloudinary(publicId,"image")
+        await deleteOnR2(publicId)
     }
 
     return res.status(200).json(new ApiResponse(200,user,"Avatar Updated Successfully"))
@@ -333,10 +334,10 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Image not found")
     }
 
-    const coverImage=await uploadOnCloudinary(coverImageLocalPath)
+    const coverImage=await uploadOnR2(coverImageLocalPath, "covers")
 
-    if(!coverImage.url){
-        throw new ApiError(404,"Image upload on cloudinary failed")
+    if(!coverImage || !coverImage.url){
+        throw new ApiError(404,"Image upload on R2 failed")
     }
 
     const currentUser=await User.findById(req.user._id)
@@ -354,7 +355,7 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
 
     if(oldCoverImageUrl){
         const publicId=extractPublicId(oldCoverImageUrl)
-        await deleteFromCloudinary(publicId,"image")
+        await deleteOnR2(publicId)
     }
 
     return res.status(200).json(new ApiResponse(200,user,"Cover Image changed Successfully"))
